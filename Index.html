@@ -1,0 +1,1502 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام الصرافة المتكامل</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chosen Palette: Earthy & Calm (Warm neutrals, soft greens, muted blues/grays) -->
+    <!-- Application Structure Plan: A single-page application built around a tabbed navigation for financial operations. Each tab represents a distinct functional area of the accounting system (Dashboard, Transfers, Receipts, Payments, Exchange, Reports, Settings). This structure provides clear segregation of duties, allowing users to focus on one task at a time, while easily navigating between different financial operations. The core interaction within each tab is form submission and table display. The 'Transfers' tab features an interactive WhatsApp message parsing and form pre-filling. A new dashboard section provides a quick financial overview. User feedback is enhanced with custom modals replacing native alerts and inline form validation. Tables and print functionality are further refined for better aesthetics and usability. -->
+    <!-- Visualization & Content Choices: Data input is via interactive forms, and records are displayed in dynamic, responsive HTML tables with improved styling. The primary interactive elements include tab switching, form input/submission, record deletion, and the WhatsApp message parsing/pre-filling. The "Dashboard" section shows aggregated financial summaries as formatted text. Print functionality now includes a professional report header and print-specific CSS. No Chart.js or Plotly.js are used as the core data is transactional and process-driven, not requiring complex analytical visualizations. Unicode characters/icons are used for visual cues. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Tahoma', 'Arial', sans-serif;
+            background-color: #fcf8f3; /* Light, warm background */
+            color: #3f3f46; /* Neutral dark text */
+        }
+        .tab-button.active {
+            @apply border-b-2 border-emerald-600 text-emerald-700 font-semibold bg-white;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .form-input-field {
+            @apply w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-300;
+            background-color: #fefcfb; /* Slightly off-white for inputs */
+        }
+        .action-button {
+            @apply bg-red-500 text-white p-2 rounded-md hover:bg-red-600 transition-colors text-sm;
+        }
+        .whatsapp-parse-button {
+            @apply bg-green-500 text-white py-2 px-4 rounded-lg flex items-center justify-center gap-2 hover:bg-green-600 transition-colors font-medium shadow-md;
+        }
+        .primary-button {
+            @apply bg-teal-600 text-white py-2 px-6 rounded-lg hover:bg-teal-700 transition-colors font-semibold shadow-md;
+        }
+        .secondary-button {
+            @apply bg-gray-300 text-gray-800 py-2 px-6 rounded-lg hover:bg-gray-400 transition-colors font-semibold shadow-md;
+        }
+        /* Table Styling */
+        .data-table-container {
+            @apply overflow-x-auto rounded-lg border border-gray-200 shadow-sm;
+        }
+        .data-table {
+            @apply min-w-full bg-white text-gray-700;
+            border-collapse: separate; /* Required for rounded corners on cells */
+            border-spacing: 0; /* Remove default spacing */
+        }
+        .data-table thead th {
+            @apply bg-gradient-to-r from-stone-200 to-stone-100 text-stone-700 uppercase text-sm py-3 px-4 text-right font-semibold;
+            border-bottom: 2px solid #d4c8be; /* Stronger bottom border for header */
+            border-top-left-radius: 8px; /* For first header cell */
+            border-top-right-radius: 8px; /* For last header cell */
+            /* This needs adjustment for RTL: first cell is top-right, last is top-left */
+        }
+        .data-table thead th:first-child { border-top-right-radius: 8px; }
+        .data-table thead th:last-child { border-top-left-radius: 8px; }
+
+        .data-table tbody tr {
+            @apply border-b border-gray-100; /* Lighter border for rows */
+        }
+        .data-table tbody tr:nth-child(even) { /* Zebra striping */
+            background-color: #fdfaf6;
+        }
+        .data-table tbody tr:hover {
+            @apply bg-gray-50;
+        }
+        .data-table tbody td {
+            @apply py-2 px-4 text-gray-700 text-right; /* Align text right */
+            border-right: 1px solid #e5e7eb; /* Right border for cells */
+            border-left: 1px solid #e5e7eb; /* Left border for cells */
+            border-bottom: 1px solid #e5e7eb; /* Bottom border for cells */
+        }
+        .data-table tbody tr:last-child td {
+            border-bottom: none; /* No bottom border for last row cells */
+        }
+        .data-table tbody tr:last-child td:first-child { border-bottom-right-radius: 8px; }
+        .data-table tbody tr:last-child td:last-child { border-bottom-left-radius: 8px; }
+
+        .error-message {
+            @apply text-red-500 text-xs mt-1;
+        }
+        /* Modal Styles */
+        .modal {
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: auto;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            width: 90%;
+            max-width: 400px;
+            text-align: center;
+        }
+        .modal-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .modal-button {
+            padding: 8px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+        .modal-confirm {
+            background-color: #10B981; /* Green */
+            color: white;
+            border: none;
+        }
+        .modal-confirm:hover {
+            background-color: #059669;
+        }
+        .modal-cancel {
+            background-color: #D1D5DB; /* Gray */
+            color: #3f3f46;
+            border: none;
+        }
+        .modal-cancel:hover {
+            background-color: #9CA3AF;
+        }
+        /* Mobile table styles */
+        @media (max-width: 768px) {
+            table.responsive-table {
+                @apply block w-full;
+            }
+            table.responsive-table thead {
+                @apply hidden;
+            }
+            table.responsive-table tbody, table.responsive-table tr, table.responsive-table td {
+                @apply block w-full;
+            }
+            table.responsive-table tr {
+                @apply mb-4 border border-gray-200 rounded-lg shadow-sm;
+            }
+            table.responsive-table td {
+                @apply text-right relative pl-32;
+            }
+            table.responsive-table td::before {
+                @apply absolute left-4 w-28 text-left font-medium text-gray-600;
+                content: attr(data-label);
+            }
+        }
+
+        /* Print-specific styles (will be injected) */
+        @media print {
+            body {
+                background-color: white;
+                margin: 0;
+                padding: 0;
+                font-size: 10pt;
+                color: #000;
+            }
+            h1, h2, h3, p {
+                color: #000 !important;
+            }
+            .no-print {
+                display: none !important;
+            }
+            .data-table-container {
+                overflow-x: visible; /* Allow tables to show full width */
+                box-shadow: none;
+                border: none;
+                border-radius: 0;
+            }
+            .data-table {
+                width: 100%;
+                table-layout: auto; /* Allow content to dictate column width */
+                border-collapse: collapse; /* For print, collapse borders */
+                border-spacing: 0;
+            }
+            .data-table thead th, .data-table tbody td {
+                border: 1px solid #ccc; /* Clearer borders for print */
+                padding: 5px 8px;
+                text-align: right;
+                background-color: white !important; /* Ensure white background for print */
+                color: black !important; /* Ensure black text for print */
+                border-radius: 0 !important; /* Remove rounded corners for print */
+            }
+            .data-table thead th {
+                background-color: #e0e0e0 !important;
+                font-weight: bold;
+            }
+            .data-table tbody tr:nth-child(even) {
+                background-color: #f5f5f5 !important;
+            }
+            /* Override mobile table styles for print */
+            table.responsive-table, table.responsive-table thead, table.responsive-table tbody, table.responsive-table tr, table.responsive-table td {
+                display: table;
+                width: 100%;
+            }
+            table.responsive-table thead {
+                display: table-header-group;
+            }
+            table.responsive-table tr {
+                display: table-row;
+                margin-bottom: 0;
+                border: 1px solid #ccc; /* Ensure border for print */
+            }
+            table.responsive-table td {
+                display: table-cell;
+                position: static;
+                padding-left: 8px; /* Reset padding */
+                text-align: right;
+            }
+            table.responsive-table td::before {
+                display: none; /* Hide data labels for print */
+            }
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-8">
+    <div class="max-w-6xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden">
+        <header class="bg-gradient-to-r from-teal-700 to-emerald-600 p-6 text-white text-center no-print">
+            <h1 class="text-3xl sm:text-4xl font-extrabold mb-2">نظام الصرافة المتكامل</h1>
+            <p class="text-sm sm:text-base opacity-90">إدارة شاملة لجميع عملياتك المالية.</p>
+        </header>
+
+        <div class="p-4 sm:p-6">
+            <!-- Navigation Tabs -->
+            <nav class="flex flex-wrap border-b border-gray-200 mb-6 no-print">
+                <button class="tab-button tab-button-dashboard flex-1 py-3 px-2 text-sm sm:text-base text-gray-600 hover:text-emerald-700 transition-colors duration-200 active" data-tab="dashboard">📈 لوحة التحكم</button>
+                <button class="tab-button tab-button-transfers flex-1 py-3 px-2 text-sm sm:text-base text-gray-600 hover:text-emerald-700 transition-colors duration-200" data-tab="transfers">🧾 التحويلات</button>
+                <button class="tab-button tab-button-receipts flex-1 py-3 px-2 text-sm sm:text-base text-gray-600 hover:text-emerald-700 transition-colors duration-200" data-tab="receipts">💰 سندات القبض</button>
+                <button class="tab-button tab-button-payments flex-1 py-3 px-2 text-sm sm:text-base text-gray-600 hover:text-emerald-700 transition-colors duration-200" data-tab="payments">💸 سندات الصرف</button>
+                <button class="tab-button tab-button-exchange flex-1 py-3 px-2 text-sm sm:text-base text-gray-600 hover:text-emerald-700 transition-colors duration-200" data-tab="exchange">💱 بيع وشراء العملات</button>
+                <button class="tab-button tab-button-reports flex-1 py-3 px-2 text-sm sm:text-base text-gray-600 hover:text-emerald-700 transition-colors duration-200" data-tab="reports">📊 كشف الحساب</button>
+                <button class="tab-button tab-button-settings flex-1 py-3 px-2 text-sm sm:text-base text-gray-600 hover:text-emerald-700 transition-colors duration-200" data-tab="settings">⚙️ الإعدادات</button>
+            </nav>
+
+            <!-- Tab Contents -->
+            <div id="tab-contents" class="p-2 sm:p-4 bg-gray-50 rounded-lg border border-gray-100 shadow-inner">
+                <!-- Dashboard Tab -->
+                <div id="dashboard" class="tab-content active">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4">📈 لوحة التحكم الرئيسية</h2>
+                    <p class="text-gray-600 mb-6">هنا يمكنك الحصول على نظرة عامة سريعة على الأرصدة الحالية للعملات المختلفة في نظامك. يتم تحديث هذه الأرصدة تلقائياً بناءً على جميع الحركات المالية المسجلة.</p>
+                    
+                    <div id="currencyBalances" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <!-- Balances will be rendered here by JS -->
+                        <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200 text-center">
+                            <p class="text-xl font-bold text-gray-800">جاري التحميل...</p>
+                        </div>
+                    </div>
+                    <p class="text-sm text-gray-500 mt-6">ملاحظة: هذه الأرصدة تعكس المجموع الكلي للحركات المسجلة في كل عملة (سندات القبض والصرف، التحويلات، وعمليات الصرافة). لمعرفة التفاصيل، يرجى مراجعة قسم "كشف الحساب".</p>
+                </div>
+
+                <!-- Transfers Tab -->
+                <div id="transfers" class="tab-content">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4">🧾 إدارة التحويلات</h2>
+                    <p class="text-gray-600 mb-6">هذا القسم مخصص لإدارة جميع التحويلات المالية الصادرة والواردة. يمكنك إدخال تفاصيل التحويل يدوياً، أو **لصق رسالة واتساب ومحاولة تحليلها** لملء الحقول تلقائياً للتبسيط.</p>
+                    
+                    <div class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                        <label for="whatsappMessageInput" class="block text-sm font-medium text-blue-800 mb-2">الصق رسالة واتساب هنا للمحاكاة:</label>
+                        <textarea id="whatsappMessageInput" rows="4" class="form-input-field mb-4 bg-white text-gray-800" placeholder="مثال: 'حوالة واردة: 2500 ريال سعودي من فهد العلي إلى خالد الرشيد.'"></textarea>
+                        <button id="parseWhatsappBtn" class="whatsapp-parse-button">
+                            <span>&#128172;</span> تحليل رسالة الواتساب وملء النموذج
+                        </button>
+                        <p id="parseFeedback" class="mt-2 text-sm text-gray-700"></p>
+                    </div>
+
+                    <form id="formTransfers" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div class="col-span-full">
+                            <label for="transferType" class="block text-sm font-medium text-gray-700 mb-1">نوع التحويل</label>
+                            <select id="transferType" class="form-input-field" required>
+                                <option value="صادر">صادر</option>
+                                <option value="وارد">وارد</option>
+                            </select>
+                            <p class="error-message" id="transferType-error"></p>
+                        </div>
+
+                        <div>
+                            <label for="transferAmount" class="block text-sm font-medium text-gray-700 mb-1">المبلغ</label>
+                            <input type="number" id="transferAmount" min="0.01" step="0.01" class="form-input-field" required placeholder="أدخل المبلغ" />
+                            <p class="error-message" id="transferAmount-error"></p>
+                        </div>
+                        <div>
+                            <label for="transferCurrency" class="block text-sm font-medium text-gray-700 mb-1">العملة</label>
+                            <select id="transferCurrency" class="form-input-field" required>
+                                <option value="">اختر عملة</option>
+                                <option value="USD">دولار أمريكي (USD)</option>
+                                <option value="EUR">يورو (EUR)</option>
+                                <option value="SAR">ريال سعودي (SAR)</option>
+                                <option value="EGP">جنيه مصري (EGP)</option>
+                                <option value="YER">ريال يمني (YER)</option>
+                            </select>
+                            <p class="error-message" id="transferCurrency-error"></p>
+                        </div>
+                        <div class="col-span-full sm:col-span-1">
+                            <label for="transferDate" class="block text-sm font-medium text-gray-700 mb-1">التاريخ</label>
+                            <input type="date" id="transferDate" class="form-input-field" required />
+                            <p class="error-message" id="transferDate-error"></p>
+                        </div>
+
+                        <div>
+                            <label for="transferSender" class="block text-sm font-medium text-gray-700 mb-1">اسم المرسل</label>
+                            <input type="text" id="transferSender" class="form-input-field" placeholder="اسم المرسل" required />
+                            <p class="error-message" id="transferSender-error"></p>
+                        </div>
+                        <div>
+                            <label for="transferSenderEntity" class="block text-sm font-medium text-gray-700 mb-1">جهة المرسل</label>
+                            <input type="text" id="transferSenderEntity" class="form-input-field" placeholder="جهة المرسل" required />
+                            <p class="error-message" id="transferSenderEntity-error"></p>
+                        </div>
+                        <div>
+                            <label for="transferReceiver" class="block text-sm font-medium text-gray-700 mb-1">اسم المستلم</label>
+                            <input type="text" id="transferReceiver" class="form-input-field" placeholder="اسم المستلم" required />
+                            <p class="error-message" id="transferReceiver-error"></p>
+                        </div>
+                        <div>
+                            <label for="transferReceiverEntity" class="block text-sm font-medium text-gray-700 mb-1">جهة المستلم</label>
+                            <input type="text" id="transferReceiverEntity" class="form-input-field" placeholder="جهة المستلم" required />
+                            <p class="error-message" id="transferReceiverEntity-error"></p>
+                        </div>
+                        
+                        <div class="col-span-full flex justify-end mt-4">
+                            <button type="submit" class="primary-button">حفظ التحويل</button>
+                        </div>
+                    </form>
+
+                    <h3 class="text-xl font-semibold text-gray-800 mt-8 mb-4">سجل التحويلات</h3>
+                    <div class="data-table-container">
+                        <table id="tableTransfers" class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>رقم</th>
+                                    <th>نوع التحويل</th>
+                                    <th>المبلغ</th>
+                                    <th>العملة</th>
+                                    <th>التاريخ</th>
+                                    <th>اسم المرسل</th>
+                                    <th>جهة المرسل</th>
+                                    <th>اسم المستلم</th>
+                                    <th>جهة المستلم</th>
+                                    <th>حذف</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    <div class="flex justify-end mt-4 no-print">
+                        <button class="secondary-button print-btn" onclick="printTable('tableTransfers', 'تقرير التحويلات')">طباعة التحويلات</button>
+                    </div>
+                </div>
+
+                <!-- Receipts Tab -->
+                <div id="receipts" class="tab-content">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4">💰 سندات القبض</h2>
+                    <p class="text-gray-600 mb-6">سجل جميع المبالغ النقدية أو الشيكات التي تم استلامها من العملاء أو الجهات الأخرى. هذا يساعد في تتبع الإيرادات بدقة.</p>
+                    <form id="formReceipts" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div>
+                            <label for="receiptAmount" class="block text-sm font-medium text-gray-700 mb-1">المبلغ</label>
+                            <input type="number" id="receiptAmount" min="0.01" step="0.01" class="form-input-field" required placeholder="أدخل المبلغ" />
+                            <p class="error-message" id="receiptAmount-error"></p>
+                        </div>
+                        <div>
+                            <label for="receiptCurrency" class="block text-sm font-medium text-gray-700 mb-1">العملة</label>
+                            <select id="receiptCurrency" class="form-input-field" required>
+                                <option value="">اختر عملة</option>
+                                <option value="USD">دولار أمريكي (USD)</option>
+                                <option value="EUR">يورو (EUR)</option>
+                                <option value="SAR">ريال سعودي (SAR)</option>
+                                <option value="EGP">جنيه مصري (EGP)</option>
+                                <option value="YER">ريال يمني (YER)</option>
+                            </select>
+                            <p class="error-message" id="receiptCurrency-error"></p>
+                        </div>
+                        <div class="col-span-full sm:col-span-1">
+                            <label for="receiptDate" class="block text-sm font-medium text-gray-700 mb-1">التاريخ</label>
+                            <input type="date" id="receiptDate" class="form-input-field" required />
+                            <p class="error-message" id="receiptDate-error"></p>
+                        </div>
+
+                        <div>
+                            <label for="receiptSender" class="block text-sm font-medium text-gray-700 mb-1">اسم المرسل</label>
+                            <input type="text" id="receiptSender" class="form-input-field" placeholder="اسم المرسل" required />
+                            <p class="error-message" id="receiptSender-error"></p>
+                        </div>
+                        <div>
+                            <label for="receiptSenderEntity" class="block text-sm font-medium text-gray-700 mb-1">جهة المرسل</label>
+                            <input type="text" id="receiptSenderEntity" class="form-input-field" placeholder="جهة المرسل" required />
+                            <p class="error-message" id="receiptSenderEntity-error"></p>
+                        </div>
+                        <div>
+                            <label for="receiptReceiver" class="block text-sm font-medium text-gray-700 mb-1">اسم المستلم (العميل)</label>
+                            <input type="text" id="receiptReceiver" class="form-input-field" placeholder="اسم المستلم" required />
+                            <p class="error-message" id="receiptReceiver-error"></p>
+                        </div>
+                        <div>
+                            <label for="receiptReceiverEntity" class="block text-sm font-medium text-gray-700 mb-1">جهة المستلم</label>
+                            <input type="text" id="receiptReceiverEntity" class="form-input-field" placeholder="جهة المستلم" required />
+                            <p class="error-message" id="receiptReceiverEntity-error"></p>
+                        </div>
+                        <div class="col-span-full">
+                            <label for="receiptNotes" class="block text-sm font-medium text-gray-700 mb-1">ملاحظات</label>
+                            <textarea id="receiptNotes" rows="3" class="form-input-field"></textarea>
+                        </div>
+
+                        <div class="col-span-full flex justify-end mt-4">
+                            <button type="submit" class="primary-button">حفظ السند</button>
+                        </div>
+                    </form>
+
+                    <h3 class="text-xl font-semibold text-gray-800 mt-8 mb-4">سجل سندات القبض</h3>
+                    <div class="data-table-container">
+                        <table id="tableReceipts" class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>رقم</th>
+                                    <th>المبلغ</th>
+                                    <th>العملة</th>
+                                    <th>التاريخ</th>
+                                    <th>اسم المرسل</th>
+                                    <th>جهة المرسل</th>
+                                    <th>اسم المستلم</th>
+                                    <th>جهة المستلم</th>
+                                    <th>ملاحظات</th>
+                                    <th>حذف</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    <div class="flex justify-end mt-4 no-print">
+                        <button class="secondary-button print-btn" onclick="printTable('tableReceipts', 'تقرير سندات القبض')">طباعة سندات القبض</button>
+                    </div>
+                </div>
+
+                <!-- Payments Tab -->
+                <div id="payments" class="tab-content">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4">💸 سندات الصرف</h2>
+                    <p class="text-gray-600 mb-6">وثّق جميع المبالغ النقدية أو الشيكات التي تم دفعها للعملاء أو الموردين أو لأي غرض آخر. هذا يسجل التدفقات النقدية الخارجة بدقة ويساعد في إدارة المصروفات.</p>
+                    <form id="formPayments" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div>
+                            <label for="paymentAmount" class="block text-sm font-medium text-gray-700 mb-1">المبلغ</label>
+                            <input type="number" id="paymentAmount" min="0.01" step="0.01" class="form-input-field" required placeholder="أدخل المبلغ" />
+                            <p class="error-message" id="paymentAmount-error"></p>
+                        </div>
+                        <div>
+                            <label for="paymentCurrency" class="block text-sm font-medium text-gray-700 mb-1">العملة</label>
+                            <select id="paymentCurrency" class="form-input-field" required>
+                                <option value="">اختر عملة</option>
+                                <option value="USD">دولار أمريكي (USD)</option>
+                                <option value="EUR">يورو (EUR)</option>
+                                <option value="SAR">ريال سعودي (SAR)</option>
+                                <option value="EGP">جنيه مصري (EGP)</option>
+                                <option value="YER">ريال يمني (YER)</option>
+                            </select>
+                            <p class="error-message" id="paymentCurrency-error"></p>
+                        </div>
+                        <div class="col-span-full sm:col-span-1">
+                            <label for="paymentDate" class="block text-sm font-medium text-gray-700 mb-1">التاريخ</label>
+                            <input type="date" id="paymentDate" class="form-input-field" required />
+                            <p class="error-message" id="paymentDate-error"></p>
+                        </div>
+
+                        <div>
+                            <label for="paymentSender" class="block text-sm font-medium text-gray-700 mb-1">اسم المرسل</label>
+                            <input type="text" id="paymentSender" class="form-input-field" placeholder="اسم المرسل" required />
+                            <p class="error-message" id="paymentSender-error"></p>
+                        </div>
+                        <div>
+                            <label for="paymentSenderEntity" class="block text-sm font-medium text-gray-700 mb-1">جهة المرسل</label>
+                            <input type="text" id="paymentSenderEntity" class="form-input-field" placeholder="جهة المرسل" required />
+                            <p class="error-message" id="paymentSenderEntity-error"></p>
+                        </div>
+                        <div>
+                            <label for="paymentReceiver" class="block text-sm font-medium text-gray-700 mb-1">اسم المستلم</label>
+                            <input type="text" id="paymentReceiver" class="form-input-field" placeholder="اسم المستلم" required />
+                            <p class="error-message" id="paymentReceiver-error"></p>
+                        </div>
+                        <div>
+                            <label for="paymentReceiverEntity" class="block text-sm font-medium text-gray-700 mb-1">جهة المستلم</label>
+                            <input type="text" id="paymentReceiverEntity" class="form-input-field" placeholder="جهة المستلم" required />
+                            <p class="error-message" id="paymentReceiverEntity-error"></p>
+                        </div>
+                        <div class="col-span-full">
+                            <label for="paymentNotes" class="block text-sm font-medium text-gray-700 mb-1">ملاحظات</label>
+                            <textarea id="paymentNotes" rows="3" class="form-input-field"></textarea>
+                        </div>
+
+                        <div class="col-span-full flex justify-end mt-4">
+                            <button type="submit" class="primary-button">حفظ السند</button>
+                        </div>
+                    </form>
+
+                    <h3 class="text-xl font-semibold text-gray-800 mt-8 mb-4">سجل سندات الصرف</h3>
+                    <div class="data-table-container">
+                        <table id="tablePayments" class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>رقم</th>
+                                    <th>المبلغ</th>
+                                    <th>العملة</th>
+                                    <th>التاريخ</th>
+                                    <th>اسم المرسل</th>
+                                    <th>جهة المرسل</th>
+                                    <th>اسم المستلم</th>
+                                    <th>جهة المستلم</th>
+                                    <th>ملاحظات</th>
+                                    <th>حذف</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    <div class="flex justify-end mt-4 no-print">
+                        <button class="secondary-button print-btn" onclick="printTable('tablePayments', 'تقرير سندات الصرف')">طباعة سندات الصرف</button>
+                    </div>
+                </div>
+
+                <!-- Exchange Tab -->
+                <div id="exchange" class="tab-content">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4">💱 بيع وشراء العملات</h2>
+                    <p class="text-gray-600 mb-6">سجل جميع عمليات بيع وشراء العملات الأجنبية. هذا القسم يساعد في تتبع الأرباح والخسائر الناتجة عن فروقات أسعار الصرف وإدارة السيولة النقدية للعملات المختلفة.</p>
+                    <form id="formExchange" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div class="col-span-full">
+                            <label for="exchangeType" class="block text-sm font-medium text-gray-700 mb-1">نوع العملية</label>
+                            <select id="exchangeType" class="form-input-field" required>
+                                <option value="">اختر نوع العملية</option>
+                                <option value="شراء">شراء</option>
+                                <option value="بيع">بيع</option>
+                            </select>
+                            <p class="error-message" id="exchangeType-error"></p>
+                        </div>
+
+                        <div>
+                            <label for="exchangeCurrency" class="block text-sm font-medium text-gray-700 mb-1">العملة</label>
+                            <select id="exchangeCurrency" class="form-input-field" required>
+                                <option value="">اختر عملة</option>
+                                <option value="USD">دولار أمريكي (USD)</option>
+                                <option value="EUR">يورو (EUR)</option>
+                                <option value="SAR">ريال سعودي (SAR)</option>
+                                <option value="EGP">جنيه مصري (EGP)</option>
+                                <option value="YER">ريال يمني (YER)</option>
+                            </select>
+                            <p class="error-message" id="exchangeCurrency-error"></p>
+                        </div>
+                        <div>
+                            <label for="exchangeRate" class="block text-sm font-medium text-gray-700 mb-1">السعر</label>
+                            <input type="number" id="exchangeRate" min="0.0001" step="0.0001" class="form-input-field" required placeholder="أدخل السعر" />
+                            <p class="error-message" id="exchangeRate-error"></p>
+                        </div>
+                        <div>
+                            <label for="exchangeAmount" class="block text-sm font-medium text-gray-700 mb-1">المبلغ</label>
+                            <input type="number" id="exchangeAmount" min="0.01" step="0.01" class="form-input-field" required placeholder="أدخل المبلغ" />
+                            <p class="error-message" id="exchangeAmount-error"></p>
+                        </div>
+                        <div class="col-span-full sm:col-span-1">
+                            <label for="exchangeDate" class="block text-sm font-medium text-gray-700 mb-1">التاريخ</label>
+                            <input type="date" id="exchangeDate" class="form-input-field" required />
+                            <p class="error-message" id="exchangeDate-error"></p>
+                        </div>
+
+                        <div class="col-span-full flex justify-end mt-4">
+                            <button type="submit" class="primary-button">حفظ العملية</button>
+                        </div>
+                    </form>
+
+                    <h3 class="text-xl font-semibold text-gray-800 mt-8 mb-4">سجل عمليات بيع وشراء العملات</h3>
+                    <div class="data-table-container">
+                        <table id="tableExchange" class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>رقم</th>
+                                    <th>نوع العملية</th>
+                                    <th>العملة</th>
+                                    <th>السعر</th>
+                                    <th>المبلغ</th>
+                                    <th>التاريخ</th>
+                                    <th>حذف</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    <div class="flex justify-end mt-4 no-print">
+                        <button class="secondary-button print-btn" onclick="printTable('tableExchange', 'تقرير بيع وشراء العملات')">طباعة بيع وشراء العملات</button>
+                    </div>
+                </div>
+
+                <!-- Reports Tab -->
+                <div id="reports" class="tab-content">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4">📊 كشف حساب العميل</h2>
+                    <p class="text-gray-600 mb-6">استخرج كشف حساب مفصل لأي عميل، مع إمكانية تحديد نطاق زمني. هذا يوفر رؤية واضحة لجميع الحركات المالية المتعلقة بالعميل، بما في ذلك التحويلات، سندات القبض والصرف.</p>
+
+                    <form id="formReports" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div class="col-span-full sm:col-span-1">
+                            <label for="reportClientName" class="block text-sm font-medium text-gray-700 mb-1">اسم العميل</label>
+                            <input type="text" id="reportClientName" class="form-input-field" placeholder="أدخل اسم العميل" />
+                            <p class="error-message" id="reportClientName-error"></p>
+                        </div>
+                        <div class="col-span-full sm:col-span-1">
+                            <label for="reportClientEntity" class="block text-sm font-medium text-gray-700 mb-1">جهة العميل (اختياري)</label>
+                            <input type="text" id="reportClientEntity" class="form-input-field" placeholder="أدخل جهة العميل" />
+                        </div>
+                        <div class="col-span-full sm:col-span-1">
+                            <label for="reportFromDate" class="block text-sm font-medium text-gray-700 mb-1">من تاريخ</label>
+                            <input type="date" id="reportFromDate" class="form-input-field" />
+                        </div>
+                        <div class="col-span-full sm:col-span-1">
+                            <label for="reportToDate" class="block text-sm font-medium text-gray-700 mb-1">إلى تاريخ</label>
+                            <input type="date" id="reportToDate" class="form-input-field" />
+                        </div>
+                        <div class="col-span-full flex justify-end mt-4">
+                            <button type="button" id="btnGenerateStatement" class="primary-button">استخراج كشف الحساب</button>
+                        </div>
+                    </form>
+
+                    <div id="statementResult" class="mt-8 p-4 bg-gray-100 rounded-lg border border-gray-200 min-h-[150px] text-sm text-gray-700 shadow-sm">
+                        <p class="text-center text-gray-500">سيظهر كشف الحساب هنا بعد استخراجه.</p>
+                    </div>
+                </div>
+
+                <!-- Settings Tab -->
+                <div id="settings" class="tab-content">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4">⚙️ الإعدادات</h2>
+                    <p class="text-gray-600 mb-6">اضبط الإعدادات العامة للنظام مثل اسم شركتك والعملة الأساسية المستخدمة في التقارير لضمان مرونة النظام.</p>
+                    <form id="formSettings" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label for="companyName" class="block text-sm font-medium text-gray-700 mb-1">اسم الشركة</label>
+                            <input type="text" id="companyName" class="form-input-field" placeholder="أدخل اسم الشركة" />
+                        </div>
+                        <div>
+                            <label for="baseCurrency" class="block text-sm font-medium text-gray-700 mb-1">العملة الأساسية</label>
+                            <select id="baseCurrency" class="form-input-field">
+                                <option value="USD">دولار أمريكي (USD)</option>
+                                <option value="EUR">يورو (EUR)</option>
+                                <option value="SAR">ريال سعودي (SAR)</option>
+                                <option value="EGP">جنيه مصري (EGP)</option>
+                                <option value="YER">ريال يمني (YER)</option>
+                            </select>
+                        </div>
+                        <div class="col-span-full flex justify-end mt-4">
+                            <button type="submit" class="primary-button">حفظ الإعدادات</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Modal for Alerts/Confirmations -->
+    <div id="customModal" class="modal hidden">
+        <div class="modal-content">
+            <h3 id="modalTitle" class="text-lg font-bold mb-4"></h3>
+            <p id="modalMessage" class="text-gray-700 mb-6"></p>
+            <div class="modal-buttons">
+                <button id="modalConfirmBtn" class="modal-button modal-confirm hidden">تأكيد</button>
+                <button id="modalCancelBtn" class="modal-button modal-cancel">إغلاق</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Custom Modal Functions
+        let resolveModalPromise;
+
+        function showCustomAlert(message, title = 'تنبيه') {
+            document.getElementById('modalTitle').textContent = title;
+            document.getElementById('modalMessage').textContent = message;
+            document.getElementById('modalConfirmBtn').classList.add('hidden');
+            document.getElementById('modalCancelBtn').textContent = 'إغلاق';
+            document.getElementById('customModal').classList.remove('hidden');
+
+            return new Promise(resolve => {
+                resolveModalPromise = resolve;
+                document.getElementById('modalCancelBtn').onclick = () => {
+                    document.getElementById('customModal').classList.add('hidden');
+                    resolve(false);
+                };
+            });
+        }
+
+        function showCustomConfirm(message, title = 'تأكيد') {
+            document.getElementById('modalTitle').textContent = title;
+            document.getElementById('modalMessage').textContent = message;
+            document.getElementById('modalConfirmBtn').classList.remove('hidden');
+            document.getElementById('modalCancelBtn').textContent = 'إلغاء';
+            document.getElementById('customModal').classList.remove('hidden');
+
+            return new Promise(resolve => {
+                resolveModalPromise = resolve;
+                document.getElementById('modalConfirmBtn').onclick = () => {
+                    document.getElementById('customModal').classList.add('hidden');
+                    resolve(true);
+                };
+                document.getElementById('modalCancelBtn').onclick = () => {
+                    document.getElementById('customModal').classList.add('hidden');
+                    resolve(false);
+                };
+            });
+        }
+
+        // --- Core Application Logic ---
+
+        // Tab switching logic
+        document.querySelectorAll('.tab-button').forEach(button => {
+            button.addEventListener('click', () => {
+                document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+                button.classList.add('active');
+                document.getElementById(button.dataset.tab).classList.add('active');
+                if (button.dataset.tab === 'dashboard') {
+                    renderDashboardSummary(); // Update dashboard when active
+                }
+            });
+        });
+
+        // Save and load data from localStorage
+        function saveData(key, data) {
+            localStorage.setItem(key, JSON.stringify(data));
+        }
+        function loadData(key) {
+            const data = localStorage.getItem(key);
+            return data ? JSON.parse(data) : [];
+        }
+
+        // Set today's date as default for date inputs
+        function setTodayDate(id) {
+            const input = document.getElementById(id);
+            if(input && !input.value) {
+                input.valueAsDate = new Date();
+            }
+        }
+
+        // Inline form validation handler
+        function validateForm(formId, fields) {
+            let isValid = true;
+            fields.forEach(field => {
+                const inputElement = document.getElementById(field.id);
+                const errorElement = document.getElementById(`${field.id}-error`);
+                if (inputElement && errorElement) {
+                    let value = inputElement.value.trim();
+                    let errorMessage = '';
+
+                    if (field.required && (!value || value === '')) { // Added "" for select default value
+                        errorMessage = 'هذا الحقل مطلوب.';
+                    } else if (field.type === 'number' && value && parseFloat(value) <= 0) {
+                        errorMessage = 'يجب أن يكون المبلغ أكبر من صفر.';
+                    } 
+
+                    if (errorMessage) {
+                        errorElement.textContent = errorMessage;
+                        inputElement.classList.add('border-red-500');
+                        isValid = false;
+                    } else {
+                        errorElement.textContent = '';
+                        inputElement.classList.remove('border-red-500');
+                    }
+                }
+            });
+            return isValid;
+        }
+
+        // Delete item from data and re-render table
+        async function deleteItem(key, index, renderFn) {
+            const confirmed = await showCustomConfirm('هل أنت متأكد من حذف هذا السجل؟', 'تأكيد الحذف');
+            if (confirmed) {
+                let arr = loadData(key);
+                arr.splice(index, 1);
+                arr = arr.map((item, i) => ({...item, رقم: i + 1}));
+                saveData(key, arr);
+                renderFn();
+                renderDashboardSummary(); // Update dashboard after deletion
+                showCustomAlert('تم حذف السجل بنجاح.');
+            }
+        }
+
+        // Print table function
+        function printTable(tableId, title) {
+            const tableElement = document.getElementById(tableId);
+            const settings = JSON.parse(localStorage.getItem('settings') || '{}');
+            const companyName = settings.companyName || 'نظام الصرافة';
+            const printDate = new Date().toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' });
+
+            const printHeader = `
+                <div style="text-align: center; margin-bottom: 20px; padding-bottom: 10px;">
+                    <h2 style="margin: 0; color: #333;">${companyName}</h2>
+                    <h1 style="margin: 5px 0 0; color: #555; font-size: 20px;">${title}</h1>
+                    <p style="margin: 5px 0 0; font-size: 12px; color: #777;">تاريخ الطباعة: ${printDate}</p>
+                </div>
+            `;
+            
+            // Clone table to manipulate without affecting original DOM
+            const clonedTable = tableElement.cloneNode(true);
+            clonedTable.classList.remove('responsive-table'); // Remove responsive classes for print
+            clonedTable.style.width = '100%'; // Ensure table takes full width in print
+
+            const originalContents = document.body.innerHTML;
+            document.body.innerHTML = `
+                <html lang="ar" dir="rtl">
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>${title}</title>
+                    <style>
+                        body {
+                            font-family: 'Tahoma', sans-serif;
+                            margin: 20mm; /* A4 margins */
+                            padding: 0;
+                            font-size: 10pt;
+                            color: #000;
+                        }
+                        h1, h2, h3, p {
+                            color: #000 !important;
+                        }
+                        table {
+                            width: 100%;
+                            border-collapse: collapse;
+                            margin-top: 20px;
+                            direction: rtl; /* Ensure RTL in print */
+                        }
+                        th, td {
+                            border: 1px solid #ccc; /* Clearer borders for print */
+                            padding: 5px 8px;
+                            text-align: right;
+                        }
+                        th {
+                            background-color: #e0e0e0 !important;
+                            color: #000 !important;
+                            font-weight: bold;
+                        }
+                        tbody tr:nth-child(even) {
+                            background-color: #f5f5f5 !important;
+                        }
+                        /* Hide the delete button column in print */
+                        .no-print-column {
+                            display: none;
+                        }
+                    </style>
+                </head>
+                <body>
+                    ${printHeader}
+                    ${clonedTable.outerHTML}
+                </body>
+                </html>
+            `;
+            // Remove the "حذف" column for printing
+            const cellsToDelete = document.querySelectorAll('th:last-child, td:last-child');
+            cellsToDelete.forEach(cell => {
+                cell.classList.add('no-print-column');
+            });
+            
+            window.print();
+            document.body.innerHTML = originalContents;
+            window.location.reload(); // Reload to restore original state
+        }
+
+        // --- Dashboard Summary ---
+        function renderDashboardSummary() {
+            const currencyBalancesDiv = document.getElementById('currencyBalances');
+            currencyBalancesDiv.innerHTML = '';
+            
+            const transfers = loadData('transfers');
+            const receipts = loadData('receipts');
+            const payments = loadData('payments');
+            const exchanges = loadData('exchanges');
+
+            let totalBalances = {}; // { 'USD': 1000, 'SAR': 500, ... }
+
+            // Process Transfers
+            transfers.forEach(tx => {
+                const amount = parseFloat(tx.مبلغ);
+                const currency = tx.عملة;
+                if (!totalBalances[currency]) totalBalances[currency] = 0;
+                if (tx.نوع === 'وارد') {
+                    totalBalances[currency] += amount;
+                } else if (tx.نوع === 'صادر') {
+                    totalBalances[currency] -= amount;
+                }
+            });
+
+            // Process Receipts
+            receipts.forEach(rcpt => {
+                const amount = parseFloat(rcpt.مبلغ);
+                const currency = rcpt.عملة;
+                if (!totalBalances[currency]) totalBalances[currency] = 0;
+                totalBalances[currency] += amount;
+            });
+
+            // Process Payments
+            payments.forEach(pay => {
+                const amount = parseFloat(pay.مبلغ);
+                const currency = pay.عملة;
+                if (!totalBalances[currency]) totalBalances[currency] = 0;
+                totalBalances[currency] -= amount;
+            });
+
+            // Process Exchanges (affecting our holdings)
+            exchanges.forEach(ex => {
+                const amount = parseFloat(ex.مبلغ);
+                const currency = ex.عملة; 
+                if (!totalBalances[currency]) totalBalances[currency] = 0;
+                if (ex.نوع === 'شراء') { // Buying a currency increases our holding of it
+                    totalBalances[currency] += amount;
+                } else if (ex.نوع === 'بيع') { // Selling a currency decreases our holding of it
+                    totalBalances[currency] -= amount;
+                }
+            });
+
+            if (Object.keys(totalBalances).length === 0) {
+                currencyBalancesDiv.innerHTML = `
+                    <div class="col-span-full bg-white p-6 rounded-lg shadow-sm border border-gray-200 text-center">
+                        <p class="text-xl font-bold text-gray-700">لا توجد أرصدة لحسابها بعد.</p>
+                        <p class="text-gray-500 mt-2">ابدأ بإضافة بعض العمليات المالية في الأقسام الأخرى.</p>
+                    </div>
+                `;
+            } else {
+                for (const currency in totalBalances) {
+                    const balance = totalBalances[currency].toFixed(2);
+                    const card = document.createElement('div');
+                    card.className = 'bg-white p-4 rounded-lg shadow-sm border border-gray-200 text-center flex flex-col items-center justify-center';
+                    card.innerHTML = `
+                        <p class="text-sm text-gray-500">${currency}</p>
+                        <p class="text-2xl font-bold ${balance >= 0 ? 'text-emerald-700' : 'text-red-600'}">${balance}</p>
+                    `;
+                    currencyBalancesDiv.appendChild(card);
+                }
+            }
+        }
+
+        // --- WhatsApp Parsing Logic ---
+        document.getElementById('parseWhatsappBtn').addEventListener('click', () => {
+            const message = document.getElementById('whatsappMessageInput').value.trim();
+            const feedbackElement = document.getElementById('parseFeedback');
+            feedbackElement.textContent = ''; // Clear previous feedback
+
+            if (!message) {
+                feedbackElement.textContent = 'الرجاء لصق رسالة واتساب في الحقل أولاً.';
+                feedbackElement.style.color = 'red';
+                return;
+            }
+
+            let parsedData = {
+                type: '',
+                amount: null,
+                currency: '',
+                sender: '',
+                senderEntity: '',
+                receiver: '',
+                receiverEntity: ''
+            };
+            let allParsed = true;
+
+            // Regex for amount and currency
+            const amountCurrencyMatch = message.match(/(\d+(?:[.,]\d+)?)\s*(دولار أمريكي|دولار|يورو|ريال سعودي|ريال|درهم إماراتي|درهم|جنيه مصري|جنيه|ريال يمني|YER|USD|EUR|SAR|AED|EGP)\b/i);
+            if (amountCurrencyMatch) {
+                parsedData.amount = parseFloat(amountCurrencyMatch[1].replace(',', '.')); // Handle comma as decimal
+                const currencyText = amountCurrencyMatch[2].toLowerCase();
+                if (currencyText.includes('دولار') || currencyText.includes('usd')) parsedData.currency = 'USD';
+                else if (currencyText.includes('يورو') || currencyText.includes('eur')) parsedData.currency = 'EUR';
+                else if (currencyText.includes('ريال سعودي') || currencyText.includes('sar')) parsedData.currency = 'SAR';
+                else if (currencyText.includes('درهم إماراتي') || currencyText.includes('aed')) parsedData.currency = 'AED';
+                else if (currencyText.includes('جنيه مصري') || currencyText.includes('egp')) parsedData.currency = 'EGP';
+                else if (currencyText.includes('ريال يمني') || currencyText.includes('yer') || currencyText === 'ريال') parsedData.currency = 'YER';
+                else allParsed = false; // Could not map currency
+            } else {
+                allParsed = false;
+            }
+
+            // Regex for transfer type (صادر/وارد)
+            if (message.includes('صادر') || message.includes('إرسال') || message.includes('لـ') || message.includes('الى')) {
+                parsedData.type = 'صادر';
+            } else if (message.includes('واردة') || message.includes('من') || message.includes('استلام')) {
+                parsedData.type = 'وارد';
+            } else {
+                parsedData.type = 'صادر'; // Default if not clear
+            }
+
+            // Extract sender and receiver names/entities
+            const arabicNamesRegex = '[\u0621-\u064A\u0660-\u0669\\s\\w.-]+'; // Arabic letters, numbers, spaces, some symbols
+            const pattern1 = new RegExp(`من\\s*(${arabicNamesRegex})(?:\\s*\\(([^\)]+?)\\))?\\s*إلى\\s*(${arabicNamesRegex})(?:\\s*\\(([^\)]+?)\\))?`, 'i');
+            const pattern2 = new RegExp(`إلى\\s*(${arabicNamesRegex})(?:\\s*\\(([^\)]+?)\\))?\\s*من\\s*(${arabicNamesRegex})(?:\\s*\\(([^\)]+?)\\))?`, 'i');
+
+            let senderReceiverMatch = message.match(pattern1);
+            if (senderReceiverMatch) {
+                parsedData.sender = senderReceiverMatch[1] ? senderReceiverMatch[1].trim() : '';
+                parsedData.senderEntity = senderReceiverMatch[2] ? senderReceiverMatch[2].trim() : 'عميل فردي';
+                parsedData.receiver = senderReceiverMatch[3] ? senderReceiverMatch[3].trim() : '';
+                parsedData.receiverEntity = senderReceiverMatch[4] ? senderReceiverMatch[4].trim() : 'عميل فردي';
+            } else {
+                senderReceiverMatch = message.match(pattern2);
+                if (senderReceiverMatch) {
+                    parsedData.receiver = senderReceiverMatch[1] ? senderReceiverMatch[1].trim() : '';
+                    parsedData.receiverEntity = senderReceiverMatch[2] ? senderReceiverMatch[2].trim() : 'عميل فردي';
+                    parsedData.sender = senderReceiverMatch[3] ? senderReceiverMatch[3].trim() : '';
+                    parsedData.senderEntity = senderReceiverMatch[4] ? senderReceiverMatch[4].trim() : 'عميل فردي';
+                } else {
+                    // Fallback for simpler patterns like "ارسل X لـ Y من Z" or "قبض X من Y لـ Z"
+                    const simpleSenderMatch = message.match(/(?:من|بواسطة|عن طريق)\s+([^.\n]+?)(?:\s*\(([^)]+)\))?/i);
+                    if(simpleSenderMatch) {
+                        parsedData.sender = simpleSenderMatch[1] ? simpleSenderMatch[1].trim() : '';
+                        parsedData.senderEntity = simpleSenderMatch[2] ? simpleSenderMatch[2].trim() : 'عميل فردي';
+                    }
+                    
+                    const simpleReceiverMatch = message.match(/(?:إلى|لـ)\s+([^.\n]+?)(?:\s*\(([^)]+)\))?/i);
+                    if(simpleReceiverMatch) {
+                        parsedData.receiver = simpleReceiverMatch[1] ? simpleReceiverMatch[1].trim() : '';
+                        parsedData.receiverEntity = simpleReceiverMatch[2] ? simpleReceiverMatch[2].trim() : 'عميل فردي';
+                    }
+                    
+                    if (!parsedData.sender || !parsedData.receiver) allParsed = false; // Mark as not fully parsed if crucial parts missing
+                    parsedData.senderEntity = parsedData.senderEntity || 'عميل فردي';
+                    parsedData.receiverEntity = parsedData.receiverEntity || 'عميل فردي';
+                }
+            }
+
+
+            // Pre-fill the form
+            document.getElementById('transferType').value = parsedData.type || 'صادر'; // Default if not found
+            document.getElementById('transferAmount').value = parsedData.amount || '';
+            document.getElementById('transferCurrency').value = parsedData.currency || 'USD'; // Default if not found
+            document.getElementById('transferSender').value = parsedData.sender || '';
+            document.getElementById('transferSenderEntity').value = parsedData.senderEntity || '';
+            document.getElementById('transferReceiver').value = parsedData.receiver || '';
+            document.getElementById('transferReceiverEntity').value = parsedData.receiverEntity || '';
+            setTodayDate('transferDate');
+
+            if (allParsed && parsedData.amount && parsedData.currency && parsedData.sender && parsedData.receiver) {
+                feedbackElement.textContent = '✅ تم تحليل الرسالة وملء النموذج بنجاح. يرجى المراجعة وحفظ الحوالة.';
+                feedbackElement.style.color = 'green';
+            } else {
+                feedbackElement.textContent = '⚠️ تم ملء بعض الحقول. يرجى مراجعة الحقول الفارغة أو غير الصحيحة وإكمالها يدوياً. (أمثلة: "المبلغ", "العملة", "المرسل", "المستلم" لم يتم التعرف عليها بوضوح).';
+                feedbackElement.style.color = 'orange';
+            }
+        });
+
+        // Transfers form submission
+        document.getElementById('formTransfers').addEventListener('submit', async e => {
+            e.preventDefault();
+            const formFields = [
+                { id: 'transferType', required: true, type: 'select' },
+                { id: 'transferAmount', required: true, type: 'number' },
+                { id: 'transferCurrency', required: true, type: 'select' },
+                { id: 'transferDate', required: true, type: 'date' },
+                { id: 'transferSender', required: true, type: 'text' },
+                { id: 'transferSenderEntity', required: true, type: 'text' },
+                { id: 'transferReceiver', required: true, type: 'text' },
+                { id: 'transferReceiverEntity', required: true, type: 'text' }
+            ];
+
+            if (!validateForm('formTransfers', formFields)) {
+                await showCustomAlert('يرجى تعبئة جميع الحقول المطلوبة بشكل صحيح قبل الحفظ.');
+                return;
+            }
+
+            const type = document.getElementById('transferType').value;
+            const amount = parseFloat(document.getElementById('transferAmount').value);
+            const currency = document.getElementById('transferCurrency').value;
+            const date = document.getElementById('transferDate').value;
+            const sender = document.getElementById('transferSender').value.trim();
+            const senderEntity = document.getElementById('transferSenderEntity').value.trim();
+            const receiver = document.getElementById('transferReceiver').value.trim();
+            const receiverEntity = document.getElementById('transferReceiverEntity').value.trim();
+
+            let transfers = loadData('transfers');
+            transfers.push({
+                رقم: transfers.length + 1,
+                نوع: type,
+                مبلغ: amount.toFixed(2),
+                عملة: currency,
+                تاريخ: date,
+                مرسل: sender,
+                جهة_مرسل: senderEntity,
+                مستلم: receiver,
+                جهة_مستلم: receiverEntity
+            });
+            saveData('transfers', transfers);
+            renderTransfersTable();
+            e.target.reset();
+            setTodayDate('transferDate');
+            document.getElementById('whatsappMessageInput').value = '';
+            document.getElementById('parseFeedback').textContent = '';
+            renderDashboardSummary(); // Update dashboard after saving
+            await showCustomAlert('تم حفظ التحويل بنجاح!');
+        });
+
+        // Render Transfers table
+        function renderTransfersTable() {
+            const data = loadData('transfers');
+            const tbody = document.querySelector('#tableTransfers tbody');
+            tbody.innerHTML = '';
+            data.forEach((item, i) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td data-label="رقم">${item.رقم}</td>
+                    <td data-label="نوع التحويل">${item.نوع}</td>
+                    <td data-label="المبلغ">${item.مبلغ}</td>
+                    <td data-label="العملة">${item.عملة}</td>
+                    <td data-label="التاريخ">${item.تاريخ}</td>
+                    <td data-label="اسم المرسل">${item.مرسل}</td>
+                    <td data-label="جهة المرسل">${item.جهة_مرسل}</td>
+                    <td data-label="اسم المستلم">${item.مستلم}</td>
+                    <td data-label="جهة المستلم">${item.جهة_مستلم}</td>
+                    <td data-label="حذف"><button class="action-button" onclick="deleteItem('transfers', ${i}, renderTransfersTable)">حذف</button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Receipts form submission
+        document.getElementById('formReceipts').addEventListener('submit', async e => {
+            e.preventDefault();
+            const formFields = [
+                { id: 'receiptAmount', required: true, type: 'number' },
+                { id: 'receiptCurrency', required: true, type: 'select' },
+                { id: 'receiptDate', required: true, type: 'date' },
+                { id: 'receiptSender', required: true, type: 'text' },
+                { id: 'receiptSenderEntity', required: true, type: 'text' },
+                { id: 'receiptReceiver', required: true, type: 'text' },
+                { id: 'receiptReceiverEntity', required: true, type: 'text' }
+            ];
+
+            if (!validateForm('formReceipts', formFields)) {
+                await showCustomAlert('يرجى تعبئة جميع الحقول المطلوبة بشكل صحيح قبل الحفظ.');
+                return;
+            }
+
+            const amount = parseFloat(document.getElementById('receiptAmount').value);
+            const currency = document.getElementById('receiptCurrency').value;
+            const date = document.getElementById('receiptDate').value;
+            const sender = document.getElementById('receiptSender').value.trim();
+            const senderEntity = document.getElementById('receiptSenderEntity').value.trim();
+            const receiver = document.getElementById('receiptReceiver').value.trim();
+            const receiverEntity = document.getElementById('receiptReceiverEntity').value.trim();
+            const notes = document.getElementById('receiptNotes').value.trim();
+
+            let receipts = loadData('receipts');
+            receipts.push({
+                رقم: receipts.length + 1,
+                مبلغ: amount.toFixed(2),
+                عملة: currency,
+                تاريخ: date,
+                مرسل: sender,
+                جهة_مرسل: senderEntity,
+                مستلم: receiver,
+                جهة_مستلم: receiverEntity,
+                ملاحظات: notes
+            });
+            saveData('receipts', receipts);
+            renderReceiptsTable();
+            e.target.reset();
+            setTodayDate('receiptDate');
+            renderDashboardSummary(); // Update dashboard after saving
+            await showCustomAlert('تم حفظ سند القبض بنجاح!');
+        });
+
+        // Render Receipts table
+        function renderReceiptsTable() {
+            const data = loadData('receipts');
+            const tbody = document.querySelector('#tableReceipts tbody');
+            tbody.innerHTML = '';
+            data.forEach((item, i) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td data-label="رقم">${item.رقم}</td>
+                    <td data-label="المبلغ">${item.مبلغ}</td>
+                    <td data-label="العملة">${item.عملة}</td>
+                    <td data-label="التاريخ">${item.تاريخ}</td>
+                    <td data-label="اسم المرسل">${item.مرسل}</td>
+                    <td data-label="جهة المرسل">${item.جهة_مرسل}</td>
+                    <td data-label="اسم المستلم">${item.مستلم}</td>
+                    <td data-label="جهة المستلم">${item.جهة_مستلم}</td>
+                    <td data-label="ملاحظات">${item.ملاحظات}</td>
+                    <td data-label="حذف"><button class="action-button" onclick="deleteItem('receipts', ${i}, renderReceiptsTable)">حذف</button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Payments form submission
+        document.getElementById('formPayments').addEventListener('submit', async e => {
+            e.preventDefault();
+            const formFields = [
+                { id: 'paymentAmount', required: true, type: 'number' },
+                { id: 'paymentCurrency', required: true, type: 'select' },
+                { id: 'paymentDate', required: true, type: 'date' },
+                { id: 'paymentSender', required: true, type: 'text' },
+                { id: 'paymentSenderEntity', required: true, type: 'text' },
+                { id: 'paymentReceiver', required: true, type: 'text' },
+                { id: 'paymentReceiverEntity', required: true, type: 'text' }
+            ];
+
+            if (!validateForm('formPayments', formFields)) {
+                await showCustomAlert('يرجى تعبئة جميع الحقول المطلوبة بشكل صحيح قبل الحفظ.');
+                return;
+            }
+
+            const amount = parseFloat(document.getElementById('paymentAmount').value);
+            const currency = document.getElementById('paymentCurrency').value;
+            const date = document.getElementById('paymentDate').value;
+            const sender = document.getElementById('paymentSender').value.trim();
+            const senderEntity = document.getElementById('paymentSenderEntity').value.trim();
+            const receiver = document.getElementById('paymentReceiver').value.trim();
+            const receiverEntity = document.getElementById('paymentReceiverEntity').value.trim();
+            const notes = document.getElementById('paymentNotes').value.trim();
+
+            let payments = loadData('payments');
+            payments.push({
+                رقم: payments.length + 1,
+                مبلغ: amount.toFixed(2),
+                عملة: currency,
+                تاريخ: date,
+                مرسل: sender,
+                جهة_مرسل: senderEntity,
+                مستلم: receiver,
+                جهة_مستلم: receiverEntity,
+                ملاحظات: notes
+            });
+            saveData('payments', payments);
+            renderPaymentsTable();
+            e.target.reset();
+            setTodayDate('paymentDate');
+            renderDashboardSummary(); // Update dashboard after saving
+            await showCustomAlert('تم حفظ سند الصرف بنجاح!');
+        });
+
+        // Render Payments table
+        function renderPaymentsTable() {
+            const data = loadData('payments');
+            const tbody = document.querySelector('#tablePayments tbody');
+            tbody.innerHTML = '';
+            data.forEach((item, i) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td data-label="رقم">${item.رقم}</td>
+                    <td data-label="المبلغ">${item.مبلغ}</td>
+                    <td data-label="العملة">${item.عملة}</td>
+                    <td data-label="التاريخ">${item.تاريخ}</td>
+                    <td data-label="اسم المرسل">${item.مرسل}</td>
+                    <td data-label="جهة المرسل">${item.جهة_مرسل}</td>
+                    <td data-label="اسم المستلم">${item.مستلم}</td>
+                    <td data-label="جهة المستلم">${item.جهة_مستلم}</td>
+                    <td data-label="ملاحظات">${item.ملاحظات}</td>
+                    <td data-label="حذف"><button class="action-button" onclick="deleteItem('payments', ${i}, renderPaymentsTable)">حذف</button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Exchange form submission
+        document.getElementById('formExchange').addEventListener('submit', async e => {
+            e.preventDefault();
+            const formFields = [
+                { id: 'exchangeType', required: true, type: 'select' },
+                { id: 'exchangeCurrency', required: true, type: 'select' },
+                { id: 'exchangeRate', required: true, type: 'number' },
+                { id: 'exchangeAmount', required: true, type: 'number' },
+                { id: 'exchangeDate', required: true, type: 'date' }
+            ];
+
+            if (!validateForm('formExchange', formFields)) {
+                await showCustomAlert('يرجى تعبئة جميع الحقول المطلوبة بشكل صحيح قبل الحفظ.');
+                return;
+            }
+
+            const type = document.getElementById('exchangeType').value;
+            const currency = document.getElementById('exchangeCurrency').value;
+            const rate = parseFloat(document.getElementById('exchangeRate').value);
+            const amount = parseFloat(document.getElementById('exchangeAmount').value);
+            const date = document.getElementById('exchangeDate').value;
+
+            let exchanges = loadData('exchanges');
+            exchanges.push({
+                رقم: exchanges.length + 1,
+                نوع: type,
+                عملة: currency,
+                سعر: rate.toFixed(4),
+                مبلغ: amount.toFixed(2),
+                تاريخ: date
+            });
+            saveData('exchanges', exchanges);
+            renderExchangeTable();
+            e.target.reset();
+            setTodayDate('exchangeDate');
+            renderDashboardSummary(); // Update dashboard after saving
+            await showCustomAlert('تم حفظ عملية الصرافة بنجاح!');
+        });
+
+        // Render Exchange table
+        function renderExchangeTable() {
+            const data = loadData('exchanges');
+            const tbody = document.querySelector('#tableExchange tbody');
+            tbody.innerHTML = '';
+            data.forEach((item, i) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td data-label="رقم">${item.رقم}</td>
+                    <td data-label="نوع العملية">${item.نوع}</td>
+                    <td data-label="العملة">${item.عملة}</td>
+                    <td data-label="السعر">${item.سعر}</td>
+                    <td data-label="المبلغ">${item.مبلغ}</td>
+                    <td data-label="التاريخ">${item.تاريخ}</td>
+                    <td data-label="حذف"><button class="action-button" onclick="deleteItem('exchanges', ${i}, renderExchangeTable)">حذف</button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Generate Report (Statement)
+        document.getElementById('btnGenerateStatement').addEventListener('click', async () => {
+            const clientName = document.getElementById('reportClientName').value.trim();
+            const clientEntity = document.getElementById('reportClientEntity').value.trim();
+            const fromDate = document.getElementById('reportFromDate').value;
+            const toDate = document.getElementById('reportToDate').value;
+            const resultDiv = document.getElementById('statementResult');
+
+            if (!clientName) {
+                await showCustomAlert('يرجى إدخال اسم العميل لاستخراج كشف الحساب.');
+                return;
+            }
+
+            const transfers = loadData('transfers');
+            const receipts = loadData('receipts');
+            const payments = loadData('payments');
+            const exchanges = loadData('exchanges');
+
+            function isInDateRange(dateStr) {
+                if (!fromDate && !toDate) return true;
+                const d = new Date(dateStr);
+                const from = fromDate ? new Date(fromDate) : null;
+                const to = toDate ? new Date(toDate) : null;
+
+                if (from && d < from) return false;
+                if (to && d > to) return false;
+                return true;
+            }
+
+            function filterByClientAndEntity(arr, senderKey, senderEntityKey, receiverKey, receiverEntityKey) {
+                return arr.filter(item => {
+                    const clientNameMatch = (item[senderKey] && item[senderKey].includes(clientName)) || (item[receiverKey] && item[receiverKey].includes(clientName));
+                    const clientEntityMatch = clientEntity ? ((item[senderEntityKey] && item[senderEntityKey].includes(clientEntity)) || (item[receiverEntityKey] && item[receiverEntityKey].includes(clientEntity))) : true;
+                    return clientNameMatch && clientEntityMatch && isInDateRange(item.تاريخ);
+                });
+            }
+
+            let allRecords = [];
+
+            allRecords = allRecords.concat(
+                filterByClientAndEntity(transfers, 'مرسل', 'جهة_مرسل', 'مستلم', 'جهة_مستلم').map(item => ({
+                    نوع: 'تحويل',
+                    تفاصيل: `${item.نوع} - من ${item.مرسل} (${item.جهة_مرسل}) إلى ${item.مستلم} (${item.جهة_مستلم})`,
+                    مبلغ: parseFloat(item.مبلغ),
+                    عملة: item.عملة,
+                    تاريخ: item.تاريخ
+                }))
+            );
+
+            allRecords = allRecords.concat(
+                filterByClientAndEntity(receipts, 'مرسل', 'جهة_مرسل', 'مستلم', 'جهة_مستلم').map(item => ({
+                    نوع: 'سند قبض',
+                    تفاصيل: `قبض من: ${item.مرسل} (${item.جهة_مرسل}) إلى: ${item.مستلم} (${item.جهة_مستلم}) - ${item.ملاحظات || ''}`,
+                    مبلغ: parseFloat(item.مبلغ),
+                    عملة: item.عملة,
+                    تاريخ: item.تاريخ
+                }))
+            );
+
+            allRecords = allRecords.concat(
+                filterByClientAndEntity(payments, 'مرسل', 'جهة_مرسل', 'مستلم', 'جهة_مستلم').map(item => ({
+                    نوع: 'سند صرف',
+                    تفاصيل: `صرف لـ: ${item.مستلم} (${item.جهة_مستلم}) من: ${item.مرسل} (${item.جهة_مرسل}) - ${item.ملاحظات || ''}`,
+                    مبلغ: parseFloat(item.مبلغ),
+                    عملة: item.عملة,
+                    تاريخ: item.تاريخ
+                }))
+            );
+
+            const relatedExchanges = exchanges.filter(item => {
+                return isInDateRange(item.تاريخ);
+            }).map(item => ({
+                نوع: 'بيع/شراء عملة',
+                تفاصيل: `${item.نوع} ${item.مبلغ} ${item.عملة} بسعر ${item.سعر}`,
+                 مبلغ: parseFloat(item.مبلغ),
+                 عملة: item.عملة,
+                تاريخ: item.تاريخ
+            }));
+            allRecords = allRecords.concat(relatedExchanges);
+
+
+            if (allRecords.length === 0) {
+                resultDiv.innerHTML = '<p class="text-center text-red-600"><b>لا توجد حركات لهذا العميل ضمن النطاق المحدد.</b></p>';
+                return;
+            }
+
+            allRecords.sort((a, b) => new Date(a.تاريخ) - new Date(b.تاريخ));
+
+            let balances = {};
+            allRecords.forEach(rec => {
+                if (!balances[rec.عملة]) balances[rec.عملة] = 0;
+                if (rec.نوع === 'سند قبض' || (rec.نوع === 'تحويل' && rec.تفاصيل.includes('وارد - من'))) {
+                    balances[rec.عملة] += rec.مبلغ;
+                } else if (rec.نوع === 'سند صرف' || (rec.نوع === 'تحويل' && rec.تفاصيل.includes('صادر - من'))) {
+                    balances[rec.عملة] -= rec.مبلغ;
+                }
+            });
+
+            let html = `
+                <h3 class="text-xl font-bold text-gray-800 mb-4">كشف الحساب لـ: ${clientName} ${clientEntity ? `(${clientEntity})` : ''}</h3>
+                <div class="data-table-container mb-6">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>التاريخ</th>
+                                <th>نوع الحركة</th>
+                                <th>التفاصيل</th>
+                                <th>المبلغ</th>
+                                <th>العملة</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+
+            allRecords.forEach(rec => {
+                html += `
+                    <tr>
+                        <td data-label="التاريخ">${rec.تاريخ}</td>
+                        <td data-label="نوع الحركة">${rec.نوع}</td>
+                        <td data-label="التفاصيل">${rec.تفاصيل}</td>
+                        <td data-label="المبلغ">${rec.مبلغ.toFixed(2)}</td>
+                        <td data-label="العملة">${rec.عملة}</td>
+                    </tr>
+                `;
+            });
+
+            html += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+
+            html += '<h3 class="text-xl font-bold text-gray-800 mt-6 mb-3">الأرصدة الحالية للعميل:</h3>';
+            html += '<ul class="list-disc list-inside bg-white p-4 rounded-lg border border-gray-200 shadow-sm">';
+            let hasBalance = false;
+            for (const [currency, bal] of Object.entries(balances)) {
+                html += `<li class="mb-1 text-gray-700">${currency}: <span class="font-bold text-teal-700">${bal.toFixed(2)}</span></li>`;
+                hasBalance = true;
+            }
+            if (!hasBalance) {
+                 html += `<li class="text-gray-500">لا توجد أرصدة محددة لهذا العميل من الحركات المسجلة (قد يكون العميل غير متأثر مباشرة بعمليات الصرافة).</li>`;
+            }
+            html += '</ul>';
+
+            resultDiv.innerHTML = html;
+        });
+
+        // Settings form submission
+        document.getElementById('formSettings').addEventListener('submit', async e => {
+            e.preventDefault();
+            const companyName = document.getElementById('companyName').value.trim();
+            const baseCurrency = document.getElementById('baseCurrency').value;
+            const settings = { companyName, baseCurrency };
+            localStorage.setItem('settings', JSON.stringify(settings));
+            await showCustomAlert('تم حفظ الإعدادات بنجاح!');
+        });
+
+        // Load settings
+        function loadSettings() {
+            const settings = localStorage.getItem('settings');
+            if (settings) {
+                const obj = JSON.parse(settings);
+                if (obj.companyName) document.getElementById('companyName').value = obj.companyName;
+                if (obj.baseCurrency) document.getElementById('baseCurrency').value = obj.baseCurrency;
+            }
+        }
+
+        // Initial load and render
+        window.addEventListener('load', () => {
+            setTodayDate('transferDate');
+            setTodayDate('receiptDate');
+            setTodayDate('paymentDate');
+            setTodayDate('exchangeDate');
+            
+            // Render all tables on load
+            renderTransfersTable();
+            renderReceiptsTable();
+            renderPaymentsTable();
+            renderExchangeTable();
+            
+            loadSettings();
+            renderDashboardSummary(); // Initial dashboard render
+        });
+    </script>
+</body>
+</html>
